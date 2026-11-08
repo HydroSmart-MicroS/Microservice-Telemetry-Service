@@ -6,9 +6,18 @@ DDD: application/internal, domain/model y domain/services, infrastructure, inter
 La base es exclusiva de este contexto. Consultas de configuración y colaboración entre servicios usan RabbitMQ RPC;
 los cambios pasan por outbox y los consumidores confirman después de procesar.
 
-El Dockerfile compila y ejecuta sus pruebas. Iniciar desde la raíz de orquestación con .env privado.
+## Operación en MAIN
 
-[Funcionalidad y arranque](../README.md) · [Guía RabbitMQ](../docs/rabbitmq-guide.md) · [Contratos](../docs/contracts.md).
+En la red de Compose, el servicio escucha en `telemetry:8080` y utiliza la base `hs_telemetry`.
+
+| Comprobación | Ruta interna |
+|---|---|
+| Proceso | `GET /health/live` |
+| Disponibilidad | `GET /health/ready` |
+
+Readiness verifica MongoDB Atlas, RabbitMQ y MQTT. Revisa el resultado en el [panel de MAIN](http://127.0.0.1:8099/). Si falla database, revisa la conexión TLS y la IP de salida autorizada en Atlas. Si falla mqtt, comprueba la conexión del ingestor con Mosquitto.
+
+Construye y ejecuta las pruebas del Dockerfile desde este clon con `docker build -t hydrosmart-telemetry .`. Para la prueba conjunta, ejecuta `./scripts/Test-Local.ps1 -DatabaseMode Hosted` desde la carpeta de orquestación.
 
 ## Historial simulado para consumo mensual
 
