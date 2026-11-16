@@ -31,7 +31,17 @@ func (s ConsumptionQueryServiceImpl) Handle(ctx context.Context, q queries.GetCo
 	if !result.From.Before(q.To) {
 		return result, nil
 	}
-	result.Summary, err = s.Repository.Summary(ctx, q.UnitID, result.From, q.To)
+	devices, err := s.Registry.Devices(ctx, q.UnitID, q.Token)
+	if err != nil {
+		return result, err
+	}
+	generalIDs := []string{}
+	for _, device := range devices {
+		if device.UnitID == q.UnitID && device.Category == "GENERAL" {
+			generalIDs = append(generalIDs, device.ID)
+		}
+	}
+	result.Summary, err = s.Repository.Summary(ctx, q.UnitID, result.From, q.To, generalIDs)
 	if err != nil {
 		return result, err
 	}
