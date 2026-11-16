@@ -31,3 +31,21 @@ calendario. Responde 202; consultar seeding/completed/total/error hasta terminar
 El consumo pasa por Mongo/outbox/RabbitMQ/Analytics antes de calcular la cotización.
 No se crea un pago hasta que el usuario pulse Pagar consumo; órdenes ya emitidas
 conservan su importe aunque después se añadan lecturas.
+
+
+## Consumo total y detalle por medidor
+
+El resumen usa GENERAL para el consumo total, el número de lecturas, el historial
+diario y las fechas de primera/última lectura. Incluye los GENERAL archivados para
+conservar su historial tras reemplazar un medidor. Una unidad heredada que todavía
+no tiene GENERAL conserva su suma anterior hasta que el propietario lo elige.
+
+La respuesta conserva todos los medidores en devices y su detalle diario en
+meterDaily. daily contiene las filas usadas para calcular el total y
+totalSource indica GENERAL o legacy_sum. Analytics, Billing y Reports usan
+el mismo resumen. La simulación nueva genera las zonas dentro del volumen GENERAL
+y conserva las muestras ya guardadas cuando se vuelve a solicitar el historial.
+
+La caché de simulación recupera la entrada inactiva menos reciente al alcanzar
+100 unidades. Las tareas activas, los historiales en ejecución y las pruebas
+de alertas mantienen su entrada.
