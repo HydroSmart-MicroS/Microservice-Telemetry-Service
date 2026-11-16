@@ -13,6 +13,8 @@ type ReadingResource struct {
 type ConsumptionResource struct {
 	FirstReadingAt *time.Time                  `json:"firstReadingAt"`
 	LastReadingAt  *time.Time                  `json:"lastReadingAt"`
+	MeterDaily     []DailyResource             `json:"meterDaily"`
+	TotalSource    string                      `json:"totalSource"`
 	Daily          []DailyResource             `json:"daily"`
 	Devices        []DeviceConsumptionResource `json:"devices"`
 	UnitID         string                      `json:"unitId"`
