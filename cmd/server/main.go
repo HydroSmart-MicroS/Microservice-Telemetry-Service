@@ -57,7 +57,9 @@ func main() {
 	if err != nil {
 		log.Fatal("MongoDB indexes unavailable")
 	}
-	httpClient := &http.Client{Timeout: 12 * time.Second, Transport: brokerrpc.NewTransport()}
+	transport := brokerrpc.NewTransport()
+	defer transport.Close()
+	httpClient := &http.Client{Timeout: 12 * time.Second, Transport: transport}
 	registry := acl.PropertiesContextFacade{BaseURL: required("PROPERTIES_INTERNAL_URL"), ServiceToken: required("INTERNAL_SERVICE_TOKEN"), Client: httpClient}
 	commands := application.NewReadingCommands(repository, registry, privacy.ReadingGuard{})
 	subscriber, err := mqttadapter.Start(ctx, required("MQTT_BROKER_URL"), required("MQTT_INGESTOR_PASSWORD"), messaging.ReadingMessageHandler{Commands: commands})
