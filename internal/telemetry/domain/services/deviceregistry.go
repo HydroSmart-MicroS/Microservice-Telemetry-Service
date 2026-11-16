@@ -8,4 +8,5 @@ import (
 type DeviceRegistry interface {
 	Resolve(context.Context, string) (entities.DeviceSnapshot, error)
 	Authorize(context.Context, string, string) (entities.UnitAccess, error)
+	Devices(context.Context, string, string) ([]entities.DeviceSnapshot, error)
 }
