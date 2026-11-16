@@ -75,7 +75,7 @@ func main() {
 	mux.Handle("GET /api/v1/consumption/readings", controller)
 	mux.Handle("GET /api/v1/consumption/daily", controller)
 	mux.Handle("GET /internal/v1/consumption", rest.InternalConsumptionController{Queries: application.NewConsumptionQueries(repository, authorization.TrustedUnitRegistry{DeviceRegistry: registry}), Secret: required("INTERNAL_SERVICE_TOKEN")})
-	generator := application.NewSimulation(ctx, commands, registry)
+	generator := application.NewSimulation(ctx, commands, registry, repository)
 	simulation := rest.SimulationController{Service: generator, Tokens: tokens}
 	mux.Handle("POST /internal/v1/privacy/{user}/erase", privacy.Handler(repository.Collection, required("INTERNAL_SERVICE_TOKEN"), func(units []string) { generator.(interface{ Forget([]string) }).Forget(units) }))
 	mux.Handle("GET /api/v1/simulation/{unitID}", simulation)
