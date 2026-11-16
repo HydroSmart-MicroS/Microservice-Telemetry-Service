@@ -2,10 +2,12 @@ package commandservices
 
 import (
 	"context"
+	"fmt"
 	"hydrosmart/telemetry/internal/telemetry/domain/model/aggregates"
 	"hydrosmart/telemetry/internal/telemetry/domain/model/commands"
 	"hydrosmart/telemetry/internal/telemetry/domain/model/entities"
 	"hydrosmart/telemetry/internal/telemetry/domain/model/valueobjects"
+	"hydrosmart/telemetry/internal/telemetry/domain/services"
 	"testing"
 	"time"
 )
@@ -166,5 +168,68 @@ func TestLiveWaterFlowIncludesRealisticBurstsAndZeroIntervals(t *testing.T) {
 	}
 	if generatedReading(reading.DeviceID, at.Add(20*time.Second), true).VolumeML != 0 {
 		t.Fatal("normal activity must include stops")
+	}
+}
+
+func TestCompletedSimulationJobsReleaseCapacity(t *testing.T) {
+	service := &SimulationCommandServiceImpl{jobs: map[string]*simulationJob{}, demoJobs: map[string]bool{}}
+	for i := 0; i < 100; i++ {
+		service.jobs[fmt.Sprint(i)] = &simulationJob{LastUsed: time.Unix(int64(i), 0)}
+	}
+	service.jobs["0"].State.Running = true
+	service.jobs["1"].State.Seeding = true
+	service.demoJobs["2"] = true
+	job, err := service.jobFor("new")
+	if err != nil || job == nil || len(service.jobs) != 100 || service.jobs["3"] != nil {
+		t.Fatal("expected the oldest inactive unit to be reclaimed")
+	}
+	if service.jobs["0"] == nil || service.jobs["1"] == nil || service.jobs["2"] == nil {
+		t.Fatal("active work was evicted")
+	}
+}
+func TestActiveSimulationJobsCannotBeEvicted(t *testing.T) {
+	service := &SimulationCommandServiceImpl{jobs: map[string]*simulationJob{}}
+	for i := 0; i < 100; i++ {
+		service.jobs[fmt.Sprint(i)] = &simulationJob{State: entities.SimulationState{Running: true}}
+	}
+	if _, err := service.jobFor("new"); err != valueobjects.ErrConflict {
+		t.Fatal("active capacity must be preserved")
+	}
+}
+func TestGeneratedGeneralIncludesAllZoneVolumes(t *testing.T) {
+	at := time.Date(2026, 11, 15, 12, 0, 10, 0, time.UTC)
+	general := entities.DeviceSnapshot{ID: "general", Category: "GENERAL"}
+	for _, live := range []bool{true, false} {
+		total := generatedMeterReading("unit", general, at, live).VolumeML
+		var zones int64
+		for i := 0; i < 11; i++ {
+			zones += generatedMeterReading("unit", entities.DeviceSnapshot{ID: fmt.Sprint(i), Category: "BAÑO"}, at, live).VolumeML
+		}
+		if total <= 0 || zones > total {
+			t.Fatal("zone measurements exceed the General")
+		}
+	}
+}
+
+type seededHistory struct {
+	services.ReadingRepository
+	rows []aggregates.RecordedReading
+}
+
+func (h seededHistory) History(context.Context, string, time.Time, time.Time, int) ([]aggregates.RecordedReading, error) {
+	return h.rows, nil
+}
+
+func TestSeedingPreservesSamplesCreatedByOlderGenerators(t *testing.T) {
+	at := time.Date(2026, 11, 1, 11, 0, 0, 0, time.UTC)
+	original := generatedReading("device", at, false)
+	original.VolumeML = 99999
+	commands := &retryCommands{}
+	service := &SimulationCommandServiceImpl{
+		Context: context.Background(), Registry: &retryRegistry{}, Commands: commands,
+		Readings: seededHistory{rows: []aggregates.RecordedReading{{Reading: original, UnitID: "unit"}}},
+	}
+	if err := service.record("unit", entities.DeviceSnapshot{ID: "device", Category: "GENERAL"}, at, false); err != nil || commands.count != 0 {
+		t.Fatal("legacy history should be retained without a conflicting write")
 	}
 }
