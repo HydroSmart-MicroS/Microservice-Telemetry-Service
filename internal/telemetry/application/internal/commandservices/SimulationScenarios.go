@@ -6,6 +6,7 @@ import (
 	"hydrosmart/telemetry/internal/telemetry/domain/model/commands"
 	"hydrosmart/telemetry/internal/telemetry/domain/model/entities"
 	"hydrosmart/telemetry/internal/telemetry/domain/model/valueobjects"
+	"sort"
 	"time"
 )
 
@@ -20,6 +21,7 @@ func (s *SimulationCommandServiceImpl) Scenario(ctx context.Context, unit, token
 	if err != nil {
 		return entities.SimulationState{}, err
 	}
+	sort.SliceStable(devices, func(i, j int) bool { return devices[i].Category == "GENERAL" && devices[j].Category != "GENERAL" })
 	now := time.Now().UTC()
 	for _, device := range devices {
 		if device.UnitID != unit || device.State != "active" {
@@ -98,14 +100,10 @@ func (s *SimulationCommandServiceImpl) startDemo(unit, device string, at time.Ti
 		s.mu.Unlock()
 		return valueobjects.ErrConflict
 	}
-	job := s.jobs[unit]
-	if job == nil {
-		if len(s.jobs) >= 100 {
-			s.mu.Unlock()
-			return valueobjects.ErrConflict
-		}
-		job = &simulationJob{}
-		s.jobs[unit] = job
+	job, err := s.jobFor(unit)
+	if err != nil {
+		s.mu.Unlock()
+		return err
 	}
 	job.State.Error = ""
 	epoch := job.Epoch
