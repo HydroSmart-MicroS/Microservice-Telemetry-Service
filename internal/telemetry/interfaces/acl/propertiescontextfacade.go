@@ -46,12 +46,13 @@ func (p PropertiesContextFacade) get(ctx context.Context, path, token string, ta
 }
 func (p PropertiesContextFacade) Resolve(ctx context.Context, id string) (entities.DeviceSnapshot, error) {
 	var dto struct {
-		ID     string `json:"id"`
-		UnitID string `json:"unitId"`
-		State  string `json:"state"`
+		ID       string `json:"id"`
+		UnitID   string `json:"unitId"`
+		State    string `json:"state"`
+		Category string `json:"category"`
 	}
 	err := p.get(ctx, "/internal/v1/devices/"+id, "", &dto)
-	return entities.DeviceSnapshot{ID: dto.ID, UnitID: dto.UnitID, State: dto.State}, err
+	return entities.DeviceSnapshot{ID: dto.ID, UnitID: dto.UnitID, State: dto.State, Category: dto.Category}, err
 }
 func (p PropertiesContextFacade) Authorize(ctx context.Context, unit, token string) (entities.UnitAccess, error) {
 	var dto struct {
@@ -60,16 +61,23 @@ func (p PropertiesContextFacade) Authorize(ctx context.Context, unit, token stri
 	err := p.get(ctx, "/internal/v1/units/"+unit+"/access", token, &dto)
 	return entities.UnitAccess{VisibleFrom: dto.VisibleFrom}, err
 }
+
+// Callers authorize the unit before requesting its trusted device inventory.
 func (p PropertiesContextFacade) Devices(ctx context.Context, unit, token string) ([]entities.DeviceSnapshot, error) {
-	var dto []struct {
-		ID     string `json:"id"`
-		UnitID string `json:"unitId"`
-		State  string `json:"state"`
+	var snapshot struct {
+		Devices []struct {
+			ID       string
+			State    string
+			Category string
+		}
 	}
-	err := p.get(ctx, "/api/v1/devices?unitId="+unit, token, &dto)
-	result := []entities.DeviceSnapshot{}
-	for _, d := range dto {
-		result = append(result, entities.DeviceSnapshot{ID: d.ID, UnitID: d.UnitID, State: d.State})
+	err := p.get(ctx, "/internal/v1/units/"+unit+"/snapshot", "", &snapshot)
+	if err != nil {
+		return nil, err
 	}
-	return result, err
+	devices := make([]entities.DeviceSnapshot, 0, len(snapshot.Devices))
+	for _, device := range snapshot.Devices {
+		devices = append(devices, entities.DeviceSnapshot{ID: device.ID, UnitID: unit, State: device.State, Category: device.Category})
+	}
+	return devices, nil
 }
