@@ -14,9 +14,13 @@ func ToResource(unitID string, result services.ConsumptionResult) resources.Cons
 	for _, d := range result.Summary.Daily {
 		daily = append(daily, resources.DailyResource{Date: d.Date, DeviceID: d.DeviceID, Liters: float64(d.VolumeML) / 1000, ReadingCount: d.Count})
 	}
+	meterDaily := make([]resources.DailyResource, 0, len(result.Summary.MeterDaily))
+	for _, day := range result.Summary.MeterDaily {
+		meterDaily = append(meterDaily, resources.DailyResource{Date: day.Date, DeviceID: day.DeviceID, Liters: float64(day.VolumeML) / 1000, ReadingCount: day.Count})
+	}
 	devices := make([]resources.DeviceConsumptionResource, 0, len(result.Summary.Devices))
 	for _, d := range result.Summary.Devices {
 		devices = append(devices, resources.DeviceConsumptionResource{DeviceID: d.DeviceID, Liters: float64(d.VolumeML) / 1000, LastReadingAt: d.LastReadingAt})
 	}
-	return resources.ConsumptionResource{UnitID: unitID, VolumeML: result.Summary.VolumeML, Liters: float64(result.Summary.VolumeML) / 1000, ReadingCount: result.Summary.ReadingCount, From: result.From, To: result.To, Items: items, Daily: daily, Devices: devices, FirstReadingAt: result.Summary.FirstReadingAt, LastReadingAt: result.Summary.LastReadingAt}
+	return resources.ConsumptionResource{UnitID: unitID, VolumeML: result.Summary.VolumeML, Liters: float64(result.Summary.VolumeML) / 1000, ReadingCount: result.Summary.ReadingCount, From: result.From, To: result.To, Items: items, Daily: daily, MeterDaily: meterDaily, TotalSource: result.Summary.TotalSource, Devices: devices, FirstReadingAt: result.Summary.FirstReadingAt, LastReadingAt: result.Summary.LastReadingAt}
 }
