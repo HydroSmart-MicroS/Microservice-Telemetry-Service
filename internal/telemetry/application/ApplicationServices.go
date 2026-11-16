@@ -9,8 +9,8 @@ import (
 	"hydrosmart/telemetry/internal/telemetry/domain/services"
 )
 
-func NewSimulation(ctx context.Context, commands services.ReadingCommandService, registry services.SimulationRegistry) services.SimulationService {
-	return &commandservices.SimulationCommandServiceImpl{Context: ctx, Commands: commands, Registry: registry}
+func NewSimulation(ctx context.Context, commands services.ReadingCommandService, registry services.SimulationRegistry, readings services.ReadingRepository) services.SimulationService {
+	return &commandservices.SimulationCommandServiceImpl{Context: ctx, Commands: commands, Registry: registry, Readings: readings}
 }
 
 func NewReadingCommands(repository services.ReadingRepository, registry services.DeviceRegistry, gate services.ReadingLifecycle) services.ReadingCommandService {
