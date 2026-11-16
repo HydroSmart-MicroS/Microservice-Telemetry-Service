@@ -15,7 +15,9 @@ func Load() error {
 	if base == "" {
 		return nil
 	}
-	client := &http.Client{Timeout: 12 * time.Second, Transport: messaging.NewTransport()}
+	transport := messaging.NewTransport()
+	defer transport.Close()
+	client := &http.Client{Timeout: 12 * time.Second, Transport: transport}
 	res, err := client.Get(strings.TrimRight(base, "/") + "/v1/config/telemetry/local")
 	if err != nil {
 		return fmt.Errorf("Config Service unavailable")
