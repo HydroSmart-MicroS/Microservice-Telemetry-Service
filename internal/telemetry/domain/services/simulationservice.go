@@ -7,7 +7,6 @@ import (
 
 type SimulationRegistry interface {
 	DeviceRegistry
-	Devices(context.Context, string, string) ([]entities.DeviceSnapshot, error)
 }
 type SimulationService interface {
 	Scenario(context.Context, string, string, string) (entities.SimulationState, error)
