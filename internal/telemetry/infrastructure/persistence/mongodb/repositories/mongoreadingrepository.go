@@ -72,14 +72,21 @@ func (r MongoReadingRepository) Insert(ctx context.Context, reading aggregates.R
 func filter(unit string, from, to time.Time) bson.M {
 	return bson.M{"unit_id": unit, "measured_at": bson.M{"$gte": from, "$lt": to}}
 }
-func (r MongoReadingRepository) Summary(ctx context.Context, unit string, from, to time.Time) (aggregates.Consumption, error) {
+func (r MongoReadingRepository) Summary(ctx context.Context, unit string, from, to time.Time, generalIDs []string) (aggregates.Consumption, error) {
 	var result aggregates.Consumption
+	totalFilter := bson.D{{Key: "$match", Value: bson.M{}}}
+	result.TotalSource = "legacy_sum"
+	if len(generalIDs) > 0 {
+		totalFilter = bson.D{{Key: "$match", Value: bson.M{"device_id": bson.M{"$in": generalIDs}}}}
+		result.TotalSource = "GENERAL"
+	}
 	cursor, err := r.Collection.Aggregate(ctx, mongo.Pipeline{
 		bson.D{{Key: "$match", Value: filter(unit, from, to)}},
 		bson.D{{Key: "$facet", Value: bson.M{
-			"total":   bson.A{bson.M{"$group": bson.M{"_id": nil, "volume": bson.M{"$sum": "$volume_ml"}, "count": bson.M{"$sum": 1}, "first": bson.M{"$min": "$measured_at"}, "last": bson.M{"$max": "$measured_at"}}}},
-			"daily":   bson.A{bson.M{"$group": bson.M{"_id": bson.M{"date": bson.M{"$dateToString": bson.M{"format": "%Y-%m-%d", "date": "$measured_at", "timezone": "America/Lima"}}, "device": "$device_id"}, "volume": bson.M{"$sum": "$volume_ml"}, "count": bson.M{"$sum": 1}}}, bson.M{"$sort": bson.D{{Key: "_id.date", Value: 1}, {Key: "_id.device", Value: 1}}}},
-			"devices": bson.A{bson.M{"$group": bson.M{"_id": "$device_id", "volume": bson.M{"$sum": "$volume_ml"}, "last": bson.M{"$max": "$measured_at"}}}, bson.M{"$sort": bson.M{"_id": 1}}},
+			"total":      bson.A{totalFilter, bson.M{"$group": bson.M{"_id": nil, "volume": bson.M{"$sum": "$volume_ml"}, "count": bson.M{"$sum": 1}, "first": bson.M{"$min": "$measured_at"}, "last": bson.M{"$max": "$measured_at"}}}},
+			"daily":      bson.A{totalFilter, bson.M{"$group": bson.M{"_id": bson.M{"date": bson.M{"$dateToString": bson.M{"format": "%Y-%m-%d", "date": "$measured_at", "timezone": "America/Lima"}}, "device": "$device_id"}, "volume": bson.M{"$sum": "$volume_ml"}, "count": bson.M{"$sum": 1}}}, bson.M{"$sort": bson.D{{Key: "_id.date", Value: 1}, {Key: "_id.device", Value: 1}}}},
+			"meterDaily": bson.A{bson.M{"$group": bson.M{"_id": bson.M{"date": bson.M{"$dateToString": bson.M{"format": "%Y-%m-%d", "date": "$measured_at", "timezone": "America/Lima"}}, "device": "$device_id"}, "volume": bson.M{"$sum": "$volume_ml"}, "count": bson.M{"$sum": 1}}}, bson.M{"$sort": bson.D{{Key: "_id.date", Value: 1}, {Key: "_id.device", Value: 1}}}},
+			"devices":    bson.A{bson.M{"$group": bson.M{"_id": "$device_id", "volume": bson.M{"$sum": "$volume_ml"}, "last": bson.M{"$max": "$measured_at"}}}, bson.M{"$sort": bson.M{"_id": 1}}},
 		}}},
 	})
 	if err != nil {
@@ -102,6 +109,14 @@ func (r MongoReadingRepository) Summary(ctx context.Context, unit string, from, 
 				Volume int64 `bson:"volume"`
 				Count  int64 `bson:"count"`
 			} `bson:"daily"`
+			MeterDaily []struct {
+				ID struct {
+					Date   string `bson:"date"`
+					Device string `bson:"device"`
+				} `bson:"_id"`
+				Volume int64 `bson:"volume"`
+				Count  int64 `bson:"count"`
+			} `bson:"meterDaily"`
 			Devices []struct {
 				ID     string    `bson:"_id"`
 				Volume int64     `bson:"volume"`
@@ -120,6 +135,9 @@ func (r MongoReadingRepository) Summary(ctx context.Context, unit string, from, 
 		}
 		for _, day := range row.Daily {
 			result.Daily = append(result.Daily, aggregates.DailyConsumption{Date: day.ID.Date, DeviceID: day.ID.Device, VolumeML: day.Volume, Count: day.Count})
+		}
+		for _, day := range row.MeterDaily {
+			result.MeterDaily = append(result.MeterDaily, aggregates.DailyConsumption{Date: day.ID.Date, DeviceID: day.ID.Device, VolumeML: day.Volume, Count: day.Count})
 		}
 		for _, device := range row.Devices {
 			result.Devices = append(result.Devices, aggregates.DeviceConsumption{DeviceID: device.ID, VolumeML: device.Volume, LastReadingAt: device.Last})
