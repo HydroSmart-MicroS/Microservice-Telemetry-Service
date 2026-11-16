@@ -39,5 +39,7 @@ type Consumption struct {
 	VolumeML, ReadingCount        int64
 	FirstReadingAt, LastReadingAt *time.Time
 	Daily                         []DailyConsumption
+	MeterDaily                    []DailyConsumption
+	TotalSource                   string
 	Devices                       []DeviceConsumption
 }
